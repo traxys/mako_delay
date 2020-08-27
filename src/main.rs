@@ -3,6 +3,18 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::{stream::StreamExt, time};
+use structopt::StructOpt;
+
+fn duration_from_secs(input: &str) -> Result<Duration, std::num::ParseIntError> {
+    let secs: u64 = input.parse()?;
+    Ok(Duration::from_secs(secs))
+}
+
+#[derive(StructOpt)]
+struct Config {
+    #[structopt(long, short, parse(try_from_str = duration_from_secs), default_value = "5", help = "How long should notifications show on screen")]
+    timeout: Duration,
+}
 
 #[derive(serde::Deserialize, Debug)]
 struct MakoValue<T> {
@@ -18,10 +30,9 @@ struct Notification {
     id: MakoValue<u64>,
 }
 
-const NOTIFICATION_DURATION: Duration = Duration::from_secs(6);
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let config = Config::from_args();
     let mut map = HashMap::new();
 
     let mut interval = time::interval(Duration::from_secs(1));
@@ -51,7 +62,7 @@ async fn main() -> anyhow::Result<()> {
                 return false;
             }
 
-            if start.elapsed() > NOTIFICATION_DURATION {
+            if start.elapsed() > config.timeout {
                 std::process::Command::new("makoctl")
                     .arg("dismiss")
                     .arg("-n")
